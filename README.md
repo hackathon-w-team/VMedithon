@@ -27,6 +27,38 @@ optimisation engine, which Python's ecosystem (numpy/scipy/OR-Tools) is far
 stronger for than Node's. Swapping Node for FastAPI keeps React on the
 frontend and Mongo for storage, while giving the engine a much better home.
 
+## TECHNICAL DETAILS
+
+Login / authentication
+
+Password storage: PBKDF2-HMAC-SHA256 (stdlib hashlib, 260,000 iterations) with a random salt per user — no plaintext, no external crypto library needed.
+Session tokens: JWT (PyJWT), signed with a shared secret (JWT_SECRET env var), 12-hour expiry. Stateless — the server doesn't track sessions, it just verifies the token's signature and expiry on each request.
+Frontend: the token is kept in localStorage and attached as an Authorization: Bearer <token> header on every API call (see api/client.ts).
+
+Retaining authentication (staying logged in)
+
+On app load, AuthContext.tsx checks localStorage for a saved token and calls GET /api/auth/me to validate it and restore the user — that's the whole "remember me" mechanism, no separate refresh-token flow.
+
+Data storage
+
+Everything is in-memory Python right now — state_store.py (hospital data) and user_store.py (accounts) are just module-level dicts/objects. Nothing survives a server restart. This is the single biggest thing to change before real deployment — swap in MongoDB (the driver motor is already in requirements.txt, unused so far).
+
+Live data fetch / sync
+
+No websockets — it's plain HTTP polling. The frontend calls GET /api/hospital/state every few seconds (setInterval) and re-renders. Simpler to build and reason about than a socket connection, at the cost of a few seconds of lag instead of instant push.
+Autosave: each edited cell debounces (waits ~800ms after you stop typing) then fires a PUT — avoids a network call per keystroke.
+Poll-vs-edit conflict: a small in-memory "dirty until" timestamp per cell stops an incoming poll from overwriting what you just typed before your save lands.
+
+Spreadsheet import/export
+
+openpyxl (pure Python) reads/writes real .xlsx files — builds a workbook in memory and streams it back as a file download; parses an uploaded workbook row-by-row on import. CSV support uses Python's built-in csv module.
+File uploads: standard HTML multipart form upload, handled by FastAPI + python-multipart.
+
+Framework layer
+
+Backend: FastAPI (Python) — handles routing, request validation via Pydantic models, and auto-generates the OpenAPI schema.
+Frontend: React + TypeScript, Vite for bundling, Tailwind for styling. No state-management library (Redux is in package.json but the app actually uses plain useState/useEffect).
+
 ## Login
 
 New accounts require admin approval before they can view or use anything.
@@ -155,6 +187,26 @@ the dashboard visualizes this dependency graph directly.
 - **Transparent-by-design model** — the Predict stage is a deterministic
   queueing formula, not a black box, which is explicitly surfaced in the
   UI rather than hidden behind a fake confidence interval.
+
+  ------------------------------------------------------------------------
+  
+  future
+-------
+broadcast message to doctors and nurse about the updates
+make the scope bigger while covering many hospitals under a single ui
+
+Done 
+-----
+role based entry
+Predefined possible what-if scenarios
+predict the wait time with simulation
+decision logs
+visual representation of Capacity overview
+visual representation of Department status
+excel sheet upload and download
+integrate admin with admission registration
+user registration approval
+
 
 ## Post-hackathon Roadmap
 
