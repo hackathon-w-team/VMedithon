@@ -115,7 +115,7 @@ cd backend
 pytest -v
 ```
 
-**Frontend**
+**frontend**
 ```bash
 cd frontend
 npm install
