@@ -37,6 +37,8 @@ class ApiError extends Error {
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'Bypass-Tunnel-Reminder': 'true',
+    'bypass-tunnel-reminder': '1',
     ...(options.headers as Record<string, string>),
   }
   if (authToken) headers.Authorization = `Bearer ${authToken}`
